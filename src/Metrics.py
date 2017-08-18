@@ -9,10 +9,17 @@ import operator
 import re
 try:
     import ujson as json
+    JSONDecodeError = ValueError
 except ImportError:
     import json
+    if (sys.version_info[1] >= 5) and (sys.version_info[0] == 3):
+        JSONDecodeError = json.JSONDecodeError
+    else:
+        JSONDecodeError = ValueError
 
 from SaveThread import SaveThread
+from tweet_parser.tweet import Tweet
+from tweet_parser.tweet_parser_errors import NotATweetError
 
 write_lock = RLock()
 
@@ -40,15 +47,11 @@ class Metrics(SaveThread):
             if act.strip() is None or act.strip() == '':
                 continue
             try:
-                activity = json.loads(act)
-            except ValueError as e:
-                self.logger.error("Invalid JSON record (%s)"%e)
+                activity = Tweet(json.loads(act))
+            except JSONDecodeError,NotATweetError as e:
+                self.logger.error("Invalid record (%s)"%e)
                 continue
-            posted_time = datetime.datetime.utcnow()
-            if "postedTime" in activity:
-                short_datetime_re = datetime_re.search(activity["postedTime"])
-                if short_datetime_re:
-                    posted_time = datetime.datetime.strptime(short_datetime_re.group(0).replace(" ","T"),fmt)
+            posted_time = activity.created_at_datetime
             bucket_minute = BUCKET_SIZE * int(posted_time.minute/BUCKET_SIZE) 
             bucket_time = datetime.datetime(posted_time.year, 
                                        posted_time.month, 
@@ -60,12 +63,9 @@ class Metrics(SaveThread):
             if bucket not in data:
                 data[bucket] = {"count": 0, "langs": {}, "verbs":{}}
             data[bucket]["count"] += 1
-            verb = activity["verb"]
+            verb = activity.tweet_type
             data[bucket]["verbs"][verb] = 1 + data[bucket]["verbs"].get(verb, 0)       
-            if "gnip" in activity and "language" in activity["gnip"]:
-                lang = activity["gnip"]["language"]["value"]
-            else:
-                lang = "None"
+            lang = str(activity.lang)
             data[bucket]["langs"][lang] = 1 + data[bucket]["langs"].get(lang, 0)
             #
             verb_list = []

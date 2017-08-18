@@ -89,6 +89,7 @@ class GnipStreamClient(object):
 
     def getStream(self, **kwargs):
         logr.info("Connecting")
+        print(self.streamURL)
         req = Request(self.streamURL, headers=self.headers)
         response = urlopen(req, timeout=(1+GNIP_KEEP_ALIVE))
         # sometimes there is a delay closing the connection, can go directly to the socket to control this

@@ -8,6 +8,7 @@ try:
     import ujson as json
 except ImportError:
     import json
+from tweet_parser.tweet import Tweet
 
 # Twitter Snowflake ID to timestamp (and back)
 # https://github.com/client9/snowflake2time/
@@ -54,4 +55,29 @@ class SaveCustomLikeCSV(SaveThread):
             self.logger.error("write failed: %s"%e)
             raise e
 
+class SaveCustomHashtagCSV(SaveThread):
+    def __init__(self, _buffer, _feedname, _savepath, _rootLogger, _startTs, _spanTs, **kwargs):
+        SaveThread.__init__(self, _buffer, _feedname, _savepath, _rootLogger, _startTs, _spanTs, **kwargs)
+
+    def write(self, file_name):
+        try:
+            # create CSV output and write it to an output to file
+            fp = gzip.open(file_name, "a")
+            buffer_formated = ''
+            for act in self.string_buffer.split("\n"):
+                if act.strip() is None or act.strip() == '':
+                    continue
+                tweet = Tweet(json.loads(act))
+                try:
+                    act_formated = ",".join([tweet.id,tweet.user_id," ".join(tweet.hashtags)])
+                except Exception as e:
+                    self.logger.error("Custom JSON->list->str formatting failed: {0}".format(e))
+                    raise e
+                buffer_formated += str(act_formated) + '\n'
+            fp.write(buffer_formated.encode('utf-8'))
+            fp.close()
+            self.logger.info("saved file %s"%file_name)
+        except Exception as e:
+            self.logger.error("write failed: %s"%e)
+            raise e
 # add more custom outputs to this file

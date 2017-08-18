@@ -9,6 +9,7 @@ try:
     import ujson as json
 except ImportError:
     import json
+from tweet_parser.tweet import Tweet
 
 #####################
 
@@ -65,22 +66,20 @@ class Redis(SaveThread):
             if act.strip() is None or act.strip() == '':
                 continue
             actJson = json.loads(act)
-            if "gnip" in actJson:
-                if "matching_rules" in actJson["gnip"]:
-                    for mr in actJson["gnip"]["matching_rules"]:
-                        self.logger.debug("inc rule (%s)"%str(mr["id"]))
-                        # Redis store of rule match counts
-                        key = ("[rule_id:"+str(mr["id"])+"]").encode("utf-8")
-                        rs.incr(key)
-                        rs.incr("TotalRuleMatchCount".encode("utf-8"))
-                else:
-                    self.logger.debug("matching_rules missing")
+            tweet = Tweet(actJson)
+            if tweet.gnip_matching_rules is not None:
+                for mr in tweet.gnip_matching_rules:
+                    self.logger.debug("inc rule (%s)"%str(mr["id"]))
+                    # Redis store of rule match counts
+                    key = ("[rule_id:"+str(mr["id"])+"]").encode("utf-8")
+                    rs.incr(key)
+                    rs.incr("TotalRuleMatchCount".encode("utf-8"))
             else:
-                self.logger.debug("gnip tag missing")
+                self.logger.debug("matching_rules missing")
             try:
             #if "body" in actJson:
-                for t in re.split("\W+", actJson["object"]["body"]):
-                    self.logger.debug(actJson["object"]["body"])
+                for t in re.split("\W+", tweet.all_text):
+                    self.logger.debug(tweet.all_text)
                     tok = t.lower()
                     if tok not in stoplist and len(tok) > 2:
                         self.logger.debug("inc (%s)"%tok)
